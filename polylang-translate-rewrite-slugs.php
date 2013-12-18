@@ -3,7 +3,7 @@
 Plugin Name: Polylang - Translate URL Rewrite Slugs
 Plugin URI: https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs
 Description: Help translate post types rewrite slugs.
-Version: 0.0.1
+Version: 0.0.2
 Author: KLicheR
 Author URI: https://github.com/KLicheR
 License: GPLv2 or later
@@ -33,6 +33,7 @@ define('PLL_TRS_INC', PLL_TRS_DIR . '/include');
  * - Translate the rewrite rules for these post types;
  * - Stop Polylang from translating rewrite rules for these post types;
  * - Fix "get_permalink" for these post types.
+ * - Fix "get_post_type_archive_link" for these post types.
  *
  * To translate a post type rewrite slug, add the filter "pll_translated_post_type_rewrite_slugs"
  * to your functions.php file or your plugin to add infos about translated slugs.
@@ -76,6 +77,8 @@ class Polylang_Translate_Rewrite_Slugs {
 		add_filter('pll_rewrite_rules', array($this, 'pll_rewrite_rules_filter'));
 		// Fix "get_permalink" for these post types.
 		add_filter('post_type_link', array($this, 'post_type_link_filter'), 10, 4);
+		// Fix "get_post_type_archive_link" for these post types.
+		add_filter('post_type_archive_link', array($this, 'post_type_archive_link_filter'), 10, 2);
 	}
 
 	/**
@@ -113,7 +116,24 @@ class Polylang_Translate_Rewrite_Slugs {
 		foreach ($this->post_types as $post_type => $pll_trs_post_type) {
 			if ($post->post_type == $post_type) {
 				// Build URL. Lang prefix is already handle.
-				return site_url('/'.$pll_trs_post_type->translated_slugs[$lang].'/'.$post->post_name);
+				return home_url('/'.$pll_trs_post_type->translated_slugs[$lang].'/'.$post->post_name);
+			}
+		}
+
+		return $post_link;
+	}
+
+	/**
+	 * Fix "get_post_type_archive_link" for this post type.
+	 */
+	public function post_type_archive_link_filter($link, $archive_post_type) {
+		$lang = pll_current_language();
+		
+		// Check if the post type is handle.
+		foreach ($this->post_types as $post_type => $pll_trs_post_type) {
+			if ($archive_post_type == $post_type) {
+				// Build URL. Lang prefix is already handle.
+				return home_url('/'.$pll_trs_post_type->translated_slugs[$lang]);
 			}
 		}
 

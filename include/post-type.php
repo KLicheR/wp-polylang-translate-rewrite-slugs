@@ -16,13 +16,13 @@ class PLL_TRS_Post_Type {
 		$this->translated_slugs = $translated_slugs;
 
 		// Translate the rewrite rules.
-		add_filter($this->post_type_object->name.'_rewrite_rules', array($this, 'translate_rewrite_rules'));
+		add_filter($this->post_type_object->name.'_rewrite_rules', array($this, 'post_type_rewrite_rules_filter'));
 	}
 
 	/**
 	 * Translate the rewrite rules.
 	 */
-	public function translate_rewrite_rules($rewrite_rules) {
+	public function post_type_rewrite_rules_filter($rewrite_rules) {
 		$translated_rules = array();
 
 		// For each lang.

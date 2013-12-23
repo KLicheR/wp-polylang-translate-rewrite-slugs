@@ -3,7 +3,7 @@
 Plugin Name: Polylang - Translate URL Rewrite Slugs
 Plugin URI: https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs
 Description: Help translate post types rewrite slugs.
-Version: 0.0.5
+Version: 0.0.6
 Author: KLicheR
 Author URI: https://github.com/KLicheR
 License: GPLv2 or later
@@ -77,6 +77,8 @@ class Polylang_Translate_Rewrite_Slugs {
 		// Fix "get_post_type_archive_link" for these post types.
 		add_filter('post_type_archive_link', array($this, 'post_type_archive_link_filter'), 10, 2);
 
+		// Fix "PLL_Frontend_Links->get_translation_url".
+		add_filter('pll_translation_url', array($this, 'pll_translation_url_filter'), 10, 2);
 		// Stop Polylang from translating rewrite rules for these post types.
 		add_filter('pll_rewrite_rules', array($this, 'pll_rewrite_rules_filter'));
 	}
@@ -128,7 +130,12 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * Fix "get_post_type_archive_link" for this post type.
 	 */
 	public function post_type_archive_link_filter($link, $archive_post_type) {
-		$lang = pll_current_language();
+		if (is_admin()) {
+			global $polylang;
+			$lang = $polylang->pref_lang->slug;
+		} else {
+			$lang = pll_current_language();
+		}
 		
 		// Check if the post type is handle.
 		foreach ($this->post_types as $post_type => $pll_trs_post_type) {
@@ -138,7 +145,24 @@ class Polylang_Translate_Rewrite_Slugs {
 			}
 		}
 
-		return $post_link;
+		return $link;
+	}
+
+	/**
+	 * Fix "PLL_Frontend_Links->get_translation_url()".
+	 */
+	public function pll_translation_url_filter($url, $lang) {
+		if (is_archive()) {
+			global $wp_query;
+
+			$post_type = $wp_query->query_vars['post_type'];
+			if (isset($this->post_types[$post_type])) {
+				return home_url('/'.$lang.'/'.$this->post_types[$post_type]->translated_slugs[$lang]);
+			}
+			return $url;
+		}
+
+		return $url;
 	}
 
 	/**

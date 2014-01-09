@@ -3,7 +3,7 @@
 Plugin Name: Polylang - Translate URL Rewrite Slugs
 Plugin URI: https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs
 Description: Help translate post types rewrite slugs.
-Version: 0.0.7
+Version: 0.0.8
 Author: KLicheR
 Author URI: https://github.com/KLicheR
 License: GPLv2 or later
@@ -106,19 +106,15 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * Fix "get_permalink" for this post type.
 	 */
 	public function post_type_link_filter($post_link, $post, $leavename, $sample) {
+		global $polylang;
+
 		// Check if the post type is handle.
 		foreach ($this->post_types as $post_type => $pll_trs_post_type) {
 			if ($post->post_type == $post_type) {
-				// In admin, posts from multiple language are shown so we have to get the lang for each one.
-				if (is_admin()) {
-					global $polylang;
-					$post_language = $polylang->model->get_post_language($post->ID);
-					if ($post_language) {
-						$lang = $post_language->slug;
-					} else {
-						return false;
-					}
-				// In the "front", we suppose that each post is shown in the current language.
+				// We always check for the post language. Otherwise, the current language.
+				$post_language = $polylang->model->get_post_language($post->ID);
+				if ($post_language) {
+					$lang = $post_language->slug;
 				} else {
 					$lang = pll_current_language();
 				}

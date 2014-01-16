@@ -3,7 +3,7 @@
 Plugin Name: Polylang - Translate URL Rewrite Slugs
 Plugin URI: https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs
 Description: Help translate post types rewrite slugs.
-Version: 0.0.10
+Version: 0.1.0
 Author: KLicheR
 Author URI: https://github.com/KLicheR
 License: GPLv2 or later
@@ -51,6 +51,8 @@ define('PLL_TRS_INC', PLL_TRS_DIR . '/include');
 class Polylang_Translate_Rewrite_Slugs {
 	// Array of custom post types handle by "Polylang - Translate URL Rewrite Slugs".
 	public $post_types;
+	// Array of taxonomies handle by "Polylang - Translate URL Rewrite Slugs".
+	public $taxonomies;
 
 	/**
 	 * Contructor.
@@ -58,6 +60,8 @@ class Polylang_Translate_Rewrite_Slugs {
 	public function __construct() {
 		// Initiate the array that will contain the "PLL_TRS_Post_Type" object.
 		$this->post_types = array();
+		// Initiate the array that will contain the...
+		$this->taxonomies = array();
 
 		add_action('init', array($this, 'init_action'), 20);
 	}
@@ -66,16 +70,24 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * Trigger on "init" action.
 	 */
 	public function init_action() {
-		// Post type to handle.
+		// Post types to handle.
 		require_once(PLL_TRS_INC . '/post-type.php');
 		$post_type_translated_slugs = apply_filters('pll_translated_post_type_rewrite_slugs', array());
 		foreach ($post_type_translated_slugs as $post_type => $translated_slugs) {
 			$this->add_post_type($post_type, $translated_slugs);
 		}
+		// Taxonomies to handle.
+		require_once(PLL_TRS_INC . '/taxonomy.php');
+		$taxonomy_translated_slugs = apply_filters('pll_translated_taxonomy_rewrite_slugs', array());
+		foreach ($taxonomy_translated_slugs as $taxonomy => $translated_slugs) {
+			$this->add_taxonomy($taxonomy, $translated_slugs);
+		}
 		// Fix "get_permalink" for these post types.
 		add_filter('post_type_link', array($this, 'post_type_link_filter'), 10, 4);
 		// Fix "get_post_type_archive_link" for these post types.
 		add_filter('post_type_archive_link', array($this, 'post_type_archive_link_filter'), 10, 2);
+		// Fix "get_term_link" for taxonomies.
+		add_filter('term_link', array($this, 'term_link_filter'), 10, 3);
 
 		// Fix "PLL_Frontend_Links->get_translation_url".
 		add_filter('pll_translation_url', array($this, 'pll_translation_url_filter'), 10, 2);
@@ -103,25 +115,42 @@ class Polylang_Translate_Rewrite_Slugs {
 	}
 
 	/**
+	 * ...
+	 */
+	public function add_taxonomy($taxonomy, $translated_slugs) {
+		global $polylang;
+
+		$languages = $polylang->model->get_languages_list();
+		$taxonomy_object = get_taxonomy($taxonomy);
+		if (!is_null($taxonomy_object)) {
+			// Add non specified slug translation to taxonomy default.
+			foreach ($languages as $language) {
+				if (!array_key_exists($language->slug, $translated_slugs)) {
+					$translated_slugs[$language->slug] = $taxonomy_object->rewrite['slug'];
+				}
+			}
+			$this->taxonomies[$taxonomy] = new PLL_TRS_Taxonomy($taxonomy_object, $translated_slugs);
+		}
+	}
+
+	/**
 	 * Fix "get_permalink" for this post type.
 	 */
 	public function post_type_link_filter($post_link, $post, $leavename, $sample) {
 		global $polylang;
 
-		// Check if the post type is handle.
-		foreach ($this->post_types as $post_type => $pll_trs_post_type) {
-			if ($post->post_type == $post_type) {
-				// We always check for the post language. Otherwise, the current language.
-				$post_language = $polylang->model->get_post_language($post->ID);
-				if ($post_language) {
-					$lang = $post_language->slug;
-				} else {
-					$lang = pll_default_language();
-				}
+		// We always check for the post language. Otherwise, the current language.
+		$post_language = $polylang->model->get_post_language($post->ID);
+		if ($post_language) {
+			$lang = $post_language->slug;
+		} else {
+			$lang = pll_default_language();
+		}
 
-				// Build URL. Lang prefix is already handle.
-				return home_url('/'.$pll_trs_post_type->translated_slugs[$lang].'/'.($leavename?"%$post->post_type%":$post->post_name));
-			}
+		// Check if the post type and the language is handle.
+		if (isset($this->post_types[$post->post_type]) && isset($this->post_types[$post->post_type]->translated_slugs[$lang])) {
+			// Build URL. Lang prefix is already handle.
+			return home_url('/'.$this->post_types[$post->post_type]->translated_slugs[$lang].'/'.($leavename?"%$post->post_type%":$post->post_name));
 		}
 
 		return $post_link;
@@ -138,15 +167,86 @@ class Polylang_Translate_Rewrite_Slugs {
 			$lang = pll_current_language();
 		}
 		
-		// Check if the post type is handle.
-		foreach ($this->post_types as $post_type => $pll_trs_post_type) {
-			if ($archive_post_type == $post_type) {
-				// Build URL. Lang prefix is already handle.
-				return home_url('/'.$pll_trs_post_type->translated_slugs[$lang]);
-			}
+		// Check if the post type and the language is handle.
+		if (isset($this->post_types[$archive_post_type]) && isset($this->post_types[$archive_post_type]->translated_slugs[$lang])) {
+			// Build URL. Lang prefix is already handle.
+			return home_url('/'.$this->post_types[$archive_post_type]->translated_slugs[$lang]);
 		}
 
 		return $link;
+	}
+
+	/**
+	 * Fix "get_term_link" for this taxonomy.
+	 */
+	public function term_link_filter($termlink, $term, $taxonomy) {
+		// Check if the post type is handle.
+		if (isset($this->taxonomies[$taxonomy])) {
+			global $wp_rewrite, $polylang;
+
+			if ( !is_object($term) ) {
+				if ( is_int($term) ) {
+					$term = get_term($term, $taxonomy);
+				} else {
+					$term = get_term_by('slug', $term, $taxonomy);
+				}
+			}
+
+			if ( !is_object($term) )
+				$term = new WP_Error('invalid_term', __('Empty Term'));
+
+			if ( is_wp_error( $term ) )
+				return $term;
+
+			// Get the term language.
+			$term_language = $polylang->model->get_term_language($term->term_id);
+			if ($term_language) {
+				$lang = $term_language->slug;
+			} else {
+				$lang = pll_default_language();
+			}
+			// Check if the language is handle.
+			if (isset($this->taxonomies[$taxonomy]->translated_slugs[$lang])) {
+				$taxonomy = $term->taxonomy;
+
+				$termlink = $wp_rewrite->get_extra_permastruct($taxonomy);
+
+				$slug = $term->slug;
+				$t = get_taxonomy($taxonomy);
+
+				if ( empty($termlink) ) {
+					if ( 'category' == $taxonomy )
+						$termlink = '?cat=' . $term->term_id;
+					elseif ( $t->query_var )
+						$termlink = "?$t->query_var=$slug";
+					else
+						$termlink = "?taxonomy=$taxonomy&term=$slug";
+					$termlink = home_url($termlink);
+				} else {
+					if ( $t->rewrite['hierarchical'] ) {
+						$hierarchical_slugs = array();
+						$ancestors = get_ancestors($term->term_id, $taxonomy);
+						foreach ( (array)$ancestors as $ancestor ) {
+							$ancestor_term = get_term($ancestor, $taxonomy);
+							$hierarchical_slugs[] = $ancestor_term->slug;
+						}
+						$hierarchical_slugs = array_reverse($hierarchical_slugs);
+						$hierarchical_slugs[] = $slug;
+						$termlink = $this->taxonomies[$taxonomy]->translated_slugs[$lang] . '/' . implode('/', $hierarchical_slugs);
+					} else {
+						$termlink = $this->taxonomies[$taxonomy]->translated_slugs[$lang] . '/' . $slug;
+					}
+					$termlink = home_url( user_trailingslashit($termlink, 'category') );
+				}
+				// Back Compat filters.
+				if ( 'post_tag' == $taxonomy )
+					$termlink = apply_filters( 'tag_link', $termlink, $term->term_id );
+				elseif ( 'category' == $taxonomy )
+					$termlink = apply_filters( 'category_link', $termlink, $term->term_id );
+			}
+		}
+
+		return $termlink;
 	}
 
 	/**
@@ -178,6 +278,12 @@ class Polylang_Translate_Rewrite_Slugs {
 		// We don't want Polylang to take care of these rewrite rules groups.
 		foreach (array_keys($this->post_types) as $post_type) {
 			$rule_key = array_search($post_type, $rules);
+			if ($rule_key) {
+				unset($rules[$rule_key]);
+			}
+		}
+		foreach (array_keys($this->taxonomies) as $taxonomy) {
+			$rule_key = array_search($taxonomy, $rules);
 			if ($rule_key) {
 				unset($rules[$rule_key]);
 			}

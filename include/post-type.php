@@ -32,7 +32,7 @@ class PLL_TRS_Post_Type {
 			// For each rule.
 			foreach ($rewrite_rules as $rule_key => $rule_value) {
 				// Shift the matches up cause "lang" will be the first.
-				$translated_rules['('.$lang.')/'.str_replace($this->post_type_object->rewrite['slug'], $translated_slug, $rule_key)] = str_replace(
+				$translated_rules['('.$lang.')/'.str_replace(trim($this->post_type_object->rewrite['slug'], '/'), $translated_slug, $rule_key)] = str_replace(
 					array('[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]', '[1]'),
 					array('[9]', '[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]'),
 					$rule_value

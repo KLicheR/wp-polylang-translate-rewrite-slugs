@@ -25,18 +25,30 @@ class PLL_TRS_Post_Type {
 	 * Translate the rewrite rules.
 	 */
 	public function post_type_rewrite_rules_filter($rewrite_rules) {
+		global $polylang;
+
 		$translated_rules = array();
 
 		// For each lang.
 		foreach ($this->translated_slugs as $lang => $translated_slug) {
-			// For each rule.
-			foreach ($rewrite_rules as $rule_key => $rule_value) {
-				// Shift the matches up cause "lang" will be the first.
-				$translated_rules['('.$lang.')/'.str_replace(trim($this->post_type_object->rewrite['slug'], '/'), $translated_slug, $rule_key)] = str_replace(
-					array('[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]', '[1]'),
-					array('[9]', '[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]'),
-					$rule_value
-				);
+			// If "Hide URL language information for default language" option is
+			// set to true the rules has to be different for the default language.
+			if ($polylang->options['hide_default'] && $lang == pll_default_language()) {
+				// For each rule.
+				foreach ($rewrite_rules as $rule_key => $rule_value) {
+					// Only translate the rewrite slug.
+					$translated_rules[str_replace(trim($this->post_type_object->rewrite['slug'], '/'), $translated_slug, $rule_key)] = $rule_value;
+				}
+			} else {
+				// For each rule.
+				foreach ($rewrite_rules as $rule_key => $rule_value) {
+					// Shift the matches up cause "lang" will be the first.
+					$translated_rules['('.$lang.')/'.str_replace(trim($this->post_type_object->rewrite['slug'], '/'), $translated_slug, $rule_key)] = str_replace(
+						array('[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]', '[1]'),
+						array('[9]', '[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]'),
+						$rule_value
+					);
+				}
 			}
 		}
 
@@ -51,6 +63,7 @@ class PLL_TRS_Post_Type {
 
 		// From Polylang (include/links-directory.php:180).
 		$languages = $polylang->model->get_languages_list(array('fields' => 'slug'));
+
 		if ($polylang->options['hide_default'])
 			$languages = array_diff($languages, array($polylang->options['default_lang']));
 
@@ -78,7 +91,21 @@ class PLL_TRS_Post_Type {
 				// Recreated it for each translation.
 				$translated_rules = array();
 				foreach ($this->translated_slugs as $lang => $translated_slug) {
-					$translated_rules["({$lang})/{$translated_slug}".$extra_rule_end] = $extra_rule_value;
+					// If "Hide URL language information for default language" option is
+					// set to true the rules has to be different for the default language.
+					if ($polylang->options['hide_default'] && $lang == pll_default_language()) {
+						// Shift the matches down cause "lang" will not be there anymore.
+						$extra_rule_value_alt = str_replace(
+							array('[9]', '[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]', '[1]'),
+							array('[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]', '[1]', '[0]'),
+							$extra_rule_value
+						);
+						// Set the "lang" param to the default language.
+						$extra_rule_value_alt = str_replace('$matches[0]', $lang, $extra_rule_value_alt);
+						$translated_rules["{$translated_slug}".$extra_rule_end] = $extra_rule_value_alt;
+					} else {
+						$translated_rules["({$lang})/{$translated_slug}".$extra_rule_end] = $extra_rule_value;
+					}
 				}
 				// Add them to the top of rewrite rules.
 				$rewrite_rules = array_merge($translated_rules, $rewrite_rules);

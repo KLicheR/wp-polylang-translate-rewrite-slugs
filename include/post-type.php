@@ -22,6 +22,9 @@ class PLL_TRS_Post_Type {
 		$this->replace_extra_rules_top();
 		// Replace "permastruct", for single.
 		$this->replace_permastruct();
+
+		// Filter extra rewrite rules made by Polylang when we added "extra_rules_top".
+		add_filter('rewrite_rules_array', array($this, 'rewrite_rules_array_filter'), 15);
 	}
 
 	/**
@@ -109,5 +112,48 @@ class PLL_TRS_Post_Type {
 				add_permastruct( $post_type.'_'.$lang, "%language%/{$translated_slug}/%$post_type%", $permastruct_args );
 			}
 		}
+	}
+
+	/**
+	 * Filter extra rewrite rules, for archives.
+	 */
+	public function rewrite_rules_array_filter($rewrite_rules) {
+		global $polylang, $wp_rewrite;
+		// echo('<pre>');var_dump($wp_rewrite);exit;
+		// echo('<pre>');var_dump($rewrite_rules);exit;
+
+		// From Polylang (include/links-directory.php:180).
+		$languages = $polylang->model->get_languages_list(array('fields' => 'slug'));
+
+		if ($polylang->options['hide_default'])
+			$languages = array_diff($languages, array($polylang->options['default_lang']));
+
+		if (!empty($languages))
+			$polylang_slug = $wp_rewrite->root . ($polylang->options['rewrite'] ? '' : 'language/') . '('.implode('|', $languages).')/';
+
+		// Extra rules from WordPress (wp-include/post.php:1309).
+		$feeds = '(' . trim( implode( '|', $wp_rewrite->feeds ) ) . ')';
+
+		$extra_rules_ends = array(
+			"/{$wp_rewrite->pagination_base}/([0-9]{1,})/?$",
+			"/$feeds/?$",
+			"/feed/$feeds/?$",
+			"/?$",
+		);
+		foreach ($this->translated_slugs as $lang => $translated_slug) {
+			$extra_rules_base = "{$polylang_slug}{$translated_slug}";
+			foreach ($extra_rules_ends as $extra_rule_end) {
+				$extra_rule_key = $extra_rules_base.$extra_rule_end;
+				// echo('<pre>');var_dump($extra_rule_key);//exit;
+				// If the rule exists.
+				if (array_key_exists($extra_rule_key, $rewrite_rules)) {
+					// Remove the rule.
+					// unset($rewrite_rules[$extra_rule_key]);
+				}
+			}
+		}
+		// echo('<pre>');var_dump($rewrite_rules);exit;
+
+		return $rewrite_rules;
 	}
 }

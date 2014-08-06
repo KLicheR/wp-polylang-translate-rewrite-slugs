@@ -1,6 +1,9 @@
 <?php
 /**
  * Post type related object.
+ *
+ * @todo Filter "extra_rules_top" after Polylang has create his translated version
+ * of them. See $this->replace_extra_rules_top.
  */
 class PLL_TRS_Post_Type {
 	// The post type object.
@@ -15,103 +18,96 @@ class PLL_TRS_Post_Type {
 		$this->post_type_object = $post_type_object;
 		$this->translated_slugs = $translated_slugs;
 
-		// Translate the rewrite rules of the post type.
-		add_filter($this->post_type_object->name.'_rewrite_rules', array($this, 'post_type_rewrite_rules_filter'));
-		// Translate extra rewrite rules set when the post type is registered, for archives.
-		add_filter('rewrite_rules_array', array($this, 'rewrite_rules_array_filter'), 15);
+		// Replace "extra_rules_top", for archive.
+		$this->replace_extra_rules_top();
+		// Replace "permastruct", for single.
+		$this->replace_permastruct();
 	}
 
 	/**
-	 * Translate the rewrite rules.
+	 * Replace "extra_rules_top", for archive.
+	 *
+	 * This code simulate the code used in WordPress function "register_post_type"
+	 * and execute it for each language. After that, Polylang will consider these
+	 * rules like "individual" post types (one by lang) and will create the appropriated
+	 * rules.
+	 *
+	 * @see Extra rules from WordPress (wp-include/post.php, register_post_type()).
 	 */
-	public function post_type_rewrite_rules_filter($rewrite_rules) {
-		global $polylang;
+	private function replace_extra_rules_top() {
+		global $polylang, $wp_rewrite;
 
-		$translated_rules = array();
+		$post_type = $this->post_type_object->name;
 
-		// For each lang.
+		if ( $this->post_type_object->has_archive ) {
+			// Remove the original extra rules.
+			$archive_slug = $this->post_type_object->has_archive === true ? $this->post_type_object->rewrite['slug'] : $this->post_type_object->has_archive;
+			if ( $this->post_type_object->rewrite['with_front'] )
+				$archive_slug = substr( $wp_rewrite->front, 1 ) . $archive_slug;
+			else
+				$archive_slug = $wp_rewrite->root . $archive_slug;
+
+			unset($wp_rewrite->extra_rules_top["{$archive_slug}/?$"]);
+			if ( $this->post_type_object->rewrite['feeds'] && $wp_rewrite->feeds ) {
+				$feeds = '(' . trim( implode( '|', $wp_rewrite->feeds ) ) . ')';
+				unset($wp_rewrite->extra_rules_top["{$archive_slug}/feed/$feeds/?$"]);
+				unset($wp_rewrite->extra_rules_top["{$archive_slug}/$feeds/?$"]);
+			}
+			if ( $this->post_type_object->rewrite['pages'] )
+				unset($wp_rewrite->extra_rules_top["{$archive_slug}/{$wp_rewrite->pagination_base}/([0-9]{1,})/?$"]);
+
+			// Add the translated extra rules.
+			foreach ($this->translated_slugs as $lang => $translated_slug) {
+				/**
+				 * @todo: Add support for "has_archive" slug -> https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs/issues/2.
+				 * Original line:
+				 *   $archive_slug = $this->post_type_object->has_archive === true ? $this->post_type_object->rewrite['slug'] : $this->post_type_object->has_archive;
+				 */
+				$archive_slug = $translated_slug;
+				if ( $this->post_type_object->rewrite['with_front'] )
+					$archive_slug = substr( $wp_rewrite->front, 1 ) . $archive_slug;
+				else
+					$archive_slug = $wp_rewrite->root . $archive_slug;
+
+				add_rewrite_rule( "{$archive_slug}/?$", "index.php?post_type=$post_type", 'top' );
+				if ( $this->post_type_object->rewrite['feeds'] && $wp_rewrite->feeds ) {
+					$feeds = '(' . trim( implode( '|', $wp_rewrite->feeds ) ) . ')';
+					add_rewrite_rule( "{$archive_slug}/feed/$feeds/?$", "index.php?post_type=$post_type" . '&feed=$matches[1]', 'top' );
+					add_rewrite_rule( "{$archive_slug}/$feeds/?$", "index.php?post_type=$post_type" . '&feed=$matches[1]', 'top' );
+				}
+				if ( $this->post_type_object->rewrite['pages'] )
+					add_rewrite_rule( "{$archive_slug}/{$wp_rewrite->pagination_base}/([0-9]{1,})/?$", "index.php?post_type=$post_type" . '&paged=$matches[1]', 'top' );
+			}
+		}
+	}
+
+	/**
+	 * Replace "permastruct", for single.
+	 *
+	 * This code simulate the code used in WordPress function "register_post_type"
+	 * and execute it for each language.
+	 *
+	 * @see Permstruct from WordPress (wp-include/post.php, register_post_type()).
+	 */
+	private function replace_permastruct() {
+		global $polylang, $wp_rewrite;
+
+		$post_type = $this->post_type_object->name;
+
+		$permastruct_args = $this->post_type_object->rewrite;
+		$permastruct_args['feed'] = $permastruct_args['feeds'];
+
+		// Remove the original permastructs.
+		unset($wp_rewrite->extra_permastructs[$post_type]);
+		// Add the translated permastructs.
 		foreach ($this->translated_slugs as $lang => $translated_slug) {
 			// If "Hide URL language information for default language" option is
 			// set to true the rules has to be different for the default language.
 			if ($polylang->options['hide_default'] && $lang == pll_default_language()) {
-				// For each rule.
-				foreach ($rewrite_rules as $rule_key => $rule_value) {
-					// Only translate the rewrite slug.
-					$translated_rules[str_replace(trim($this->post_type_object->rewrite['slug'], '/'), $translated_slug, $rule_key)] = $rule_value;
-				}
+				add_permastruct( $post_type.'_'.$lang, "{$translated_slug}/%$post_type%", $permastruct_args );
 			} else {
-				// For each rule.
-				foreach ($rewrite_rules as $rule_key => $rule_value) {
-					// Shift the matches up cause "lang" will be the first.
-					$translated_rules['('.$lang.')/'.str_replace(trim($this->post_type_object->rewrite['slug'], '/'), $translated_slug, $rule_key)] = str_replace(
-						array('[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]', '[1]'),
-						array('[9]', '[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]'),
-						$rule_value
-					);
-				}
+				add_permastruct( $post_type.'_'.$lang, "%language%/{$translated_slug}/%$post_type%", $permastruct_args );
 			}
 		}
-
-		return $translated_rules;
-	}
-
-	/**
-	 * Translate extra rewrite rules set when the post type is registered, for archives.
-	 */
-	public function rewrite_rules_array_filter($rewrite_rules) {
-		global $polylang, $wp_rewrite;
-
-		// From Polylang (include/links-directory.php:180).
-		$languages = $polylang->model->get_languages_list(array('fields' => 'slug'));
-
-		if ($polylang->options['hide_default'])
-			$languages = array_diff($languages, array($polylang->options['default_lang']));
-
-		if (!empty($languages))
-			$polylang_slug = $wp_rewrite->root . ($polylang->options['rewrite'] ? '' : 'language/') . '('.implode('|', $languages).')/';
-
-		// Extra rules from WordPress (wp-include/post.php:1309).
-		$feeds = '(' . trim( implode( '|', $wp_rewrite->feeds ) ) . ')';
-		$extra_rules_base = "{$polylang_slug}{$this->post_type_object->rewrite['slug']}";
-		$extra_rules_ends = array(
-			"/{$wp_rewrite->pagination_base}/([0-9]{1,})/?$",
-			"/$feeds/?$",
-			"/feed/$feeds/?$",
-			"/?$",
-		);
-
-		foreach ($extra_rules_ends as $extra_rule_end) {
-			$extra_rule_key = $extra_rules_base.$extra_rule_end;
-			// If the rule exists.
-			if (array_key_exists($extra_rule_key, $rewrite_rules)) {
-				// Save the value.
-				$extra_rule_value = $rewrite_rules[$extra_rule_key];
-				// Remove the rule.
-				unset($rewrite_rules[$extra_rule_key]);
-				// Recreated it for each translation.
-				$translated_rules = array();
-				foreach ($this->translated_slugs as $lang => $translated_slug) {
-					// If "Hide URL language information for default language" option is
-					// set to true the rules has to be different for the default language.
-					if ($polylang->options['hide_default'] && $lang == pll_default_language()) {
-						// Shift the matches down cause "lang" will not be there anymore.
-						$extra_rule_value_alt = str_replace(
-							array('[1]', '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]', '[9]'),
-							array('[0]', '[1]', '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]'),
-							$extra_rule_value
-						);
-						// Set the "lang" param to the default language.
-						$extra_rule_value_alt = str_replace('$matches[0]', $lang, $extra_rule_value_alt);
-						$translated_rules["{$translated_slug}".$extra_rule_end] = $extra_rule_value_alt;
-					} else {
-						$translated_rules["({$lang})/{$translated_slug}".$extra_rule_end] = $extra_rule_value;
-					}
-				}
-				// Add them to the top of rewrite rules.
-				$rewrite_rules = array_merge($translated_rules, $rewrite_rules);
-			}
-		}
-
-		return $rewrite_rules;
 	}
 }

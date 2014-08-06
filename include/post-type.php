@@ -96,8 +96,8 @@ class PLL_TRS_Post_Type {
 					if ($polylang->options['hide_default'] && $lang == pll_default_language()) {
 						// Shift the matches down cause "lang" will not be there anymore.
 						$extra_rule_value_alt = str_replace(
-							array('[9]', '[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]', '[1]'),
-							array('[8]', '[7]', '[6]', '[5]', '[4]', '[3]', '[2]', '[1]', '[0]'),
+							array('[1]', '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]', '[9]'),
+							array('[0]', '[1]', '[2]', '[3]', '[4]', '[5]', '[6]', '[7]', '[8]'),
 							$extra_rule_value
 						);
 						// Set the "lang" param to the default language.

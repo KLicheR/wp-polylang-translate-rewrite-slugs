@@ -3,13 +3,13 @@
 Plugin Name: Polylang - Translate URL Rewrite Slugs
 Plugin URI: https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs
 Description: Help translate post types rewrite slugs.
-Version: 0.2.0
+Version: 0.3.0
 Author: KLicheR
 Author URI: https://github.com/KLicheR
 License: GPLv2 or later
 */
 
-/*  Copyright 2013  Kristoffer Laurin-Racicot  (email : kristoffer.lr@gmail.com)
+/*  Copyright 2014  Kristoffer Laurin-Racicot  (email : kristoffer.lr@gmail.com)
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License, version 2, as 
@@ -29,21 +29,36 @@ define('PLL_TRS_DIR', dirname(__FILE__));
 define('PLL_TRS_INC', PLL_TRS_DIR . '/include');
 
 /**
- * Translate rewrite slugs for post types by doing 3 things:
- * - Translate the rewrite rules for these post types;
+ * Translate rewrite slugs for post types by doing 5 things:
+ * - Remove original extra rewrite rules and permastruct for these post types;
+ * - Translate the extra rewrite rules and permastruct for these post types;
  * - Stop Polylang from translating rewrite rules for these post types;
  * - Fix "get_permalink" for these post types.
  * - Fix "get_post_type_archive_link" for these post types.
  *
  * To translate a post type rewrite slug, add the filter "pll_translated_post_type_rewrite_slugs"
- * to your functions.php file or your plugin to add infos about translated slugs.
+ * to your functions.php file or your plugin and add the "has_archive" and
+ * "rewrite" key has you normally do for the params of the "register_post_type"
+ * Wordpress function but add it for each post type and language you want.
  *
  * Example:
  *  add_filter('pll_translated_post_type_rewrite_slugs', function($post_type_translated_slugs) {
- *  	// Add translation for "my_post_type".
- *  	$post_type_translated_slugs['my_post_type'] = array(	
- *  		'en' => 'my-english/rewrite-slug',
- *  		'fr' => 'my-french/rewrite-slug',
+ *  	// Add translation for "product" post type.
+ *  	$post_type_translated_slugs['product'] = array(
+ *  		'product' => array(
+ *  			'fr' => array(
+ *  				'has_archive' => true,
+ *  				'rewrite' => array(
+ *  					'slug' => 'produit',
+ *  				),
+ *  			),
+ *  			'en' => array(
+ *  				'has_archive' => true,
+ *  				'rewrite' => array(
+ *  					'slug' => 'product',
+ *  				),
+ *  			),
+ *  		),
  *  	);
  *  	return $post_type_translated_slugs;
  *  });
@@ -111,7 +126,7 @@ class Polylang_Translate_Rewrite_Slugs {
 			// Add non specified slug translation to post type default.
 			foreach ($languages as $language) {
 				if (!array_key_exists($language->slug, $translated_slugs)) {
-					$translated_slugs[$language->slug] = $post_type_object->rewrite['slug'];
+					$translated_slugs[$language->slug] = array();
 				}
 			}
 			$this->post_types[$post_type] = new PLL_TRS_Post_Type($post_type_object, $translated_slugs);
@@ -151,10 +166,10 @@ class Polylang_Translate_Rewrite_Slugs {
 			$lang = pll_default_language();
 		}
 
-		// Check if the post type and the language is handle.
-		if (isset($this->post_types[$post->post_type]) && isset($this->post_types[$post->post_type]->translated_slugs[$lang])) {
+		// Check if the post type is handle.
+		if (isset($this->post_types[$post->post_type])) {
 			// Build URL. Lang prefix is already handle.
-			return home_url('/'.$this->post_types[$post->post_type]->translated_slugs[$lang].'/'.($leavename?"%$post->post_type%":$post->post_name));
+			return home_url('/'.$this->post_types[$post->post_type]->translated_slugs[$lang]->rewrite['slug'].'/'.($leavename?"%$post->post_type%":$post->post_name));
 		}
 
 		return $post_link;
@@ -170,11 +185,42 @@ class Polylang_Translate_Rewrite_Slugs {
 		} else {
 			$lang = pll_current_language();
 		}
-		
-		// Check if the post type and the language is handle.
-		if (isset($this->post_types[$archive_post_type]) && isset($this->post_types[$archive_post_type]->translated_slugs[$lang])) {
-			// Build URL. Lang prefix is already handle.
-			return home_url('/'.$this->post_types[$archive_post_type]->translated_slugs[$lang].'/');
+
+		// Check if the post type is handle.
+		if (isset($this->post_types[$archive_post_type])) {
+			return $this->get_post_type_archive_link($archive_post_type, $lang);
+		}
+
+		return $link;
+	}
+
+	/**
+	 * Reproduce "get_post_type_archive_link" WordPress function.
+	 *
+	 * @see wp-include/link-template.php, get_post_type_archive_link().
+	 */
+	private function get_post_type_archive_link($post_type, $lang) {
+		global $wp_rewrite;
+
+		// If the post type is handle, let the "$this->get_post_type_archive_link"
+		// function handle this.
+		if (isset($this->post_types[$post_type])) {
+			$translated_slugs = $this->post_types[$post_type]->translated_slugs;
+			$translated_slug = $translated_slugs[$lang];
+
+			if ( ! $translated_slug->has_archive )
+				return false;
+
+			if ( get_option( 'permalink_structure' ) && is_array( $translated_slug->rewrite ) ) {
+				$struct = ( true === $translated_slug->has_archive ) ? $translated_slug->rewrite['slug'] : $translated_slug->has_archive;
+				if ( $translated_slug->rewrite['with_front'] )
+					$struct = $wp_rewrite->front . $struct;
+				else
+					$struct = $wp_rewrite->root . $struct;
+				$link = home_url( user_trailingslashit( $struct, 'post_type_archive' ) );
+			} else {
+				$link = home_url( '?post_type=' . $post_type );
+			}
 		}
 
 		return $link;
@@ -266,16 +312,11 @@ class Polylang_Translate_Rewrite_Slugs {
 		}
 		elseif (is_archive()) {
 			$post_type = $wp_query->query_vars['post_type'];
+			// If the post type is handle, let the "$this->get_post_type_archive_link"
+			// function handle this.
 			if (isset($this->post_types[$post_type])) {
-				// If "Hide URL language information for default language" option is
-				// set to true the rules has to be different for the default language.
-				if ($polylang->options['hide_default'] && $lang == pll_default_language()) {
-					return home_url('/'.$this->post_types[$post_type]->translated_slugs[$lang]);
-				} else {
-					return home_url('/'.$lang.'/'.$this->post_types[$post_type]->translated_slugs[$lang]);
-				}
+				return $this->get_post_type_archive_link($post_type, $lang);
 			}
-			return $url;
 		}
 
 		return $url;

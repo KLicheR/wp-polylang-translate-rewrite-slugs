@@ -24,7 +24,7 @@ Example
 <?php
 add_filter('pll_translated_post_type_rewrite_slugs', function($post_type_translated_slugs) {
 	// Add translation for "product" post type.
-	$post_type_translated_slugs['product'] = array(
+	$post_type_translated_slugs = array(
 		'product' => array(
 			'fr' => array(
 				'has_archive' => true,

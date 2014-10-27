@@ -3,7 +3,7 @@
 Plugin Name: Polylang - Translate URL Rewrite Slugs
 Plugin URI: https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs
 Description: Help translate post types rewrite slugs.
-Version: 0.3.1
+Version: 0.3.2
 Author: KLicheR
 Author URI: https://github.com/KLicheR
 License: GPLv2 or later
@@ -200,7 +200,7 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * @see wp-include/link-template.php, get_post_type_archive_link().
 	 */
 	private function get_post_type_archive_link($post_type, $lang) {
-		global $wp_rewrite;
+		global $wp_rewrite, $polylang;
 
 		// If the post type is handle, let the "$this->get_post_type_archive_link"
 		// function handle this.
@@ -213,6 +213,17 @@ class Polylang_Translate_Rewrite_Slugs {
 
 			if ( get_option( 'permalink_structure' ) && is_array( $translated_slug->rewrite ) ) {
 				$struct = ( true === $translated_slug->has_archive ) ? $translated_slug->rewrite['slug'] : $translated_slug->has_archive;
+
+				if (
+					// If the "URL modifications" is set to "The language is set from the directory name in pretty permalinks".
+					$polylang->options['force_lang'] == 1
+					// If NOT ("Hide URL language information for default language" option is
+					// set to true and the $lang is the default language.)
+					&& !($polylang->options['hide_default'] && $lang == pll_default_language())
+				) {
+					$struct = $lang . '/' . $struct;
+				}
+
 				if ( $translated_slug->rewrite['with_front'] )
 					$struct = $wp_rewrite->front . $struct;
 				else

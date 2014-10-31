@@ -139,6 +139,9 @@ class PLL_TRS_Post_Type {
 			if ( false !== $args->rewrite && ( is_admin() || '' != get_option( 'permalink_structure' ) ) ) {
 				$permastruct_args = $args->rewrite;
 				$permastruct_args['feed'] = $permastruct_args['feeds'];
+				// Set the walk_dirs to false to avoid conflict with has_archive = false and the %language%
+				// in the rewrite directive. Without it the archive page redirect to the frontpage if has_archive is false.
+				$permastruct_args['walk_dirs'] = false;
 
 				// If "Hide URL language information for default language" option is
 				// set to true the rules has to be different for the default language.

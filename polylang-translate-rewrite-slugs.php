@@ -3,7 +3,7 @@
 Plugin Name: Polylang - Translate URL Rewrite Slugs
 Plugin URI: https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs
 Description: Help translate post types rewrite slugs.
-Version: 0.3.3
+Version: 0.3.4
 Author: KLicheR
 Author URI: https://github.com/KLicheR
 License: GPLv2 or later
@@ -61,6 +61,16 @@ define('PLL_TRS_INC', PLL_TRS_DIR . '/include');
  *  		),
  *  	);
  *  	return $post_type_translated_slugs;
+ *  });
+ *  add_filter('pll_translated_taxonomy_rewrite_slugs', function($taxonomy_translated_slugs) {
+ *  	// Add translation for "color" taxonomy.
+ *  	$taxonomy_translated_slugs = array(
+ *  		'color' => array(
+ *  			'fr' => 'couleur'
+ *  			'en' => 'color',
+ *  		),
+ *  	);
+ *  	return $taxonomy_translated_slugs;
  *  });
  */
 class Polylang_Translate_Rewrite_Slugs {
@@ -123,10 +133,14 @@ class Polylang_Translate_Rewrite_Slugs {
 		$languages = $polylang->model->get_languages_list();
 		$post_type_object = get_post_type_object($post_type);
 		if (!is_null($post_type_object)) {
-			// Add non specified slug translation to post type default.
 			foreach ($languages as $language) {
+				// Add non specified slug translation to post type default.
 				if (!array_key_exists($language->slug, $translated_slugs)) {
 					$translated_slugs[$language->slug] = array();
+				}
+				// Trim "/" of the slug.
+				if (isset($translated_slugs[$language->slug]['rewrite']['slug'])) {
+					$translated_slugs[$language->slug]['rewrite']['slug'] = trim($translated_slugs[$language->slug]['rewrite']['slug'], '/');
 				}
 			}
 			$this->post_types[$post_type] = new PLL_TRS_Post_Type($post_type_object, $translated_slugs);
@@ -142,13 +156,18 @@ class Polylang_Translate_Rewrite_Slugs {
 		$languages = $polylang->model->get_languages_list();
 		$taxonomy_object = get_taxonomy($taxonomy);
 		if (!is_null($taxonomy_object)) {
-			// Add non specified slug translation to taxonomy default.
+			$translated_struct = array();
 			foreach ($languages as $language) {
+				// Add non specified slug translation to taxonomy default.
 				if (!array_key_exists($language->slug, $translated_slugs)) {
 					$translated_slugs[$language->slug] = $taxonomy_object->rewrite['slug'];
 				}
+				// Trim "/".
+				$translated_slugs[$language->slug] = trim($translated_slugs[$language->slug], '/');
+				// Generate "struct" with "slug" as WordPress would do.
+				$translated_struct[$language->slug] = $translated_slugs[$language->slug] . "/{$taxonomy_object->name}";
 			}
-			$this->taxonomies[$taxonomy] = new PLL_TRS_Taxonomy($taxonomy_object, $translated_slugs);
+			$this->taxonomies[$taxonomy] = new PLL_TRS_Taxonomy($taxonomy_object, $translated_slugs, $translated_struct);
 		}
 	}
 
@@ -270,7 +289,7 @@ class Polylang_Translate_Rewrite_Slugs {
 			if (isset($this->taxonomies[$taxonomy]->translated_slugs[$lang])) {
 				$taxonomy = $term->taxonomy;
 
-				$termlink = $wp_rewrite->get_extra_permastruct($taxonomy);
+				$termlink = $this->taxonomies[$taxonomy]->translated_slugs[$lang];
 
 				$slug = $term->slug;
 				$t = get_taxonomy($taxonomy);
@@ -293,9 +312,9 @@ class Polylang_Translate_Rewrite_Slugs {
 						}
 						$hierarchical_slugs = array_reverse($hierarchical_slugs);
 						$hierarchical_slugs[] = $slug;
-						$termlink = $this->taxonomies[$taxonomy]->translated_slugs[$lang] . '/' . implode('/', $hierarchical_slugs);
+						$termlink = str_replace("%$taxonomy%", implode('/', $hierarchical_slugs), $termlink);
 					} else {
-						$termlink = $this->taxonomies[$taxonomy]->translated_slugs[$lang] . '/' . $slug;
+						$termlink = str_replace("%$taxonomy%", $slug, $termlink);
 					}
 					$termlink = home_url( user_trailingslashit($termlink, 'category') );
 				}

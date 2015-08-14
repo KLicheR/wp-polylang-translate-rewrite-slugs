@@ -12,7 +12,7 @@ License: GPLv2 or later
 /*  Copyright 2014  Kristoffer Laurin-Racicot  (email : kristoffer.lr@gmail.com)
 
 	This program is free software; you can redistribute it and/or modify
-	it under the terms of the GNU General Public License, version 2, as 
+	it under the terms of the GNU General Public License, version 2, as
 	published by the Free Software Foundation.
 
 	This program is distributed in the hope that it will be useful,
@@ -66,7 +66,7 @@ define('PLL_TRS_INC', PLL_TRS_DIR . '/include');
  *  	// Add translation for "color" taxonomy.
  *  	$taxonomy_translated_slugs = array(
  *  		'color' => array(
- *  			'fr' => 'couleur',
+ *  			'fr' => 'couleur'
  *  			'en' => 'color',
  *  		),
  *  	);
@@ -289,6 +289,8 @@ class Polylang_Translate_Rewrite_Slugs {
 			if (isset($this->taxonomies[$taxonomy]->translated_slugs[$lang])) {
 				$taxonomy = $term->taxonomy;
 
+				$termlink_old = $termlink;
+				$taxonomy_lang = $this->taxonomies[$taxonomy]->translated_slugs[$lang];
 				$termlink = $this->taxonomies[$taxonomy]->translated_slugs[$lang];
 
 				$slug = $term->slug;
@@ -314,7 +316,9 @@ class Polylang_Translate_Rewrite_Slugs {
 						$hierarchical_slugs[] = $slug;
 						$termlink = str_replace("%$taxonomy%", implode('/', $hierarchical_slugs), $termlink);
 					} else {
-						$termlink = str_replace("%$taxonomy%", $slug, $termlink);
+						//$termlink = str_replace("%$taxonomy%", $slug, $termlink);
+						$termlink = preg_replace("/\/furnitures\/(.*)\//D", "/$taxonomy_lang/$1/", $termlink_old);
+						return $termlink;
 					}
 					$termlink = home_url( user_trailingslashit($termlink, 'category') );
 				}

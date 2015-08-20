@@ -3,7 +3,7 @@
 Plugin Name: Polylang - Translate URL Rewrite Slugs
 Plugin URI: https://github.com/KLicheR/wp-polylang-translate-rewrite-slugs
 Description: Help translate post types rewrite slugs.
-Version: 0.3.5
+Version: 0.3.6
 Author: KLicheR
 Author URI: https://github.com/KLicheR
 License: GPLv2 or later
@@ -165,7 +165,7 @@ class Polylang_Translate_Rewrite_Slugs {
 				// Trim "/".
 				$translated_slugs[$language->slug] = trim($translated_slugs[$language->slug], '/');
 				// Generate "struct" with "slug" as WordPress would do.
-				$translated_struct[$language->slug] = $translated_slugs[$language->slug] . "/{$taxonomy_object->name}";
+				$translated_struct[$language->slug] = $translated_slugs[$language->slug] . "/%{$taxonomy_object->name}%";
 			}
 			$this->taxonomies[$taxonomy] = new PLL_TRS_Taxonomy($taxonomy_object, $translated_slugs, $translated_struct);
 		}
@@ -289,7 +289,7 @@ class Polylang_Translate_Rewrite_Slugs {
 			if (isset($this->taxonomies[$taxonomy]->translated_slugs[$lang])) {
 				$taxonomy = $term->taxonomy;
 
-				$termlink = $this->taxonomies[$taxonomy]->translated_slugs[$lang];
+				$termlink = $this->taxonomies[$taxonomy]->translated_struct[$lang];
 
 				$slug = $term->slug;
 				$t = get_taxonomy($taxonomy);

@@ -66,7 +66,7 @@ define('PLL_TRS_INC', PLL_TRS_DIR . '/include');
  *  	// Add translation for "color" taxonomy.
  *  	$taxonomy_translated_slugs = array(
  *  		'color' => array(
- *  			'fr' => 'couleur'
+ *  			'fr' => 'couleur',
  *  			'en' => 'color',
  *  		),
  *  	);

@@ -341,7 +341,7 @@ class Polylang_Translate_Rewrite_Slugs {
 			return home_url('/'.$lang.'/'.$translated_term->slug);
 		}
 		elseif (is_archive()) {
-			$post_type = $wp_query->query_vars['post_type'];
+			$post_type = array_values($wp_query->query_vars['post_type'])[0];
 			// If the post type is handle, let the "$this->get_post_type_archive_link"
 			// function handle this.
 			if (isset($this->post_types[$post_type])) {

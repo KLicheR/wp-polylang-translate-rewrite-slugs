@@ -1,6 +1,7 @@
 {
     "name": "klicher/wp-polylang-translate-rewrite-slugs",
     "description": "Polylang - Translate URL Rewrite Slugs",
+    "type": "wordpress-plugin",
     "repositories":[
         {
             "type":"composer",

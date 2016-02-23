@@ -172,7 +172,7 @@ class Polylang_Translate_Rewrite_Slugs {
 	 */
 	public function post_type_link_filter($post_link, $post, $leavename, $sample) {
 		// We always check for the post language. Otherwise, the current language.
-		$post_language = PLL()->model->get_post_language($post->ID);
+		$post_language = PLL()->model->post->get_language($post->ID);
 		if ($post_language) {
 			$lang = $post_language->slug;
 		} else {

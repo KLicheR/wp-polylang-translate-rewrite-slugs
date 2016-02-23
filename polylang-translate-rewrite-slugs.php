@@ -128,9 +128,7 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * Create a "PLL_TRS_Post_Type" and add it to the handled post type list.
 	 */
 	public function add_post_type($post_type, $translated_slugs) {
-		global $polylang;
-
-		$languages = $polylang->model->get_languages_list();
+		$languages = PLL()->model->get_languages_list();
 		$post_type_object = get_post_type_object($post_type);
 		if (!is_null($post_type_object)) {
 			foreach ($languages as $language) {
@@ -151,9 +149,7 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * ...
 	 */
 	public function add_taxonomy($taxonomy, $translated_slugs) {
-		global $polylang;
-
-		$languages = $polylang->model->get_languages_list();
+		$languages = PLL()->model->get_languages_list();
 		$taxonomy_object = get_taxonomy($taxonomy);
 		if (!is_null($taxonomy_object)) {
 			$translated_struct = array();
@@ -175,10 +171,8 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * Fix "get_permalink" for this post type.
 	 */
 	public function post_type_link_filter($post_link, $post, $leavename, $sample) {
-		global $polylang;
-
 		// We always check for the post language. Otherwise, the current language.
-		$post_language = $polylang->model->get_post_language($post->ID);
+		$post_language = PLL()->model->get_post_language($post->ID);
 		if ($post_language) {
 			$lang = $post_language->slug;
 		} else {
@@ -199,8 +193,7 @@ class Polylang_Translate_Rewrite_Slugs {
 	 */
 	public function post_type_archive_link_filter($link, $archive_post_type) {
 		if (is_admin()) {
-			global $polylang;
-			$lang = $polylang->pref_lang->slug;
+			$lang = PLL()->pref_lang->slug;
 		} else {
 			$lang = pll_current_language();
 		}
@@ -219,7 +212,7 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * @see wp-include/link-template.php, get_post_type_archive_link().
 	 */
 	private function get_post_type_archive_link($post_type, $lang) {
-		global $wp_rewrite, $polylang;
+		global $wp_rewrite;
 
 		// If the post type is handle, let the "$this->get_post_type_archive_link"
 		// function handle this.
@@ -235,10 +228,10 @@ class Polylang_Translate_Rewrite_Slugs {
 
 				if (
 					// If the "URL modifications" is set to "The language is set from the directory name in pretty permalinks".
-					$polylang->options['force_lang'] == 1
+					PLL()->options['force_lang'] == 1
 					// If NOT ("Hide URL language information for default language" option is
 					// set to true and the $lang is the default language.)
-					&& !($polylang->options['hide_default'] && $lang == pll_default_language())
+					&& !(PLL()->options['hide_default'] && $lang == pll_default_language())
 				) {
 					$struct = $lang . '/' . $struct;
 				}
@@ -262,7 +255,7 @@ class Polylang_Translate_Rewrite_Slugs {
 	public function term_link_filter($termlink, $term, $taxonomy) {
 		// Check if the post type is handle.
 		if (isset($this->taxonomies[$taxonomy])) {
-			global $wp_rewrite, $polylang;
+			global $wp_rewrite;
 
 			if ( !is_object($term) ) {
 				if ( is_int($term) ) {
@@ -279,7 +272,7 @@ class Polylang_Translate_Rewrite_Slugs {
 				return $term;
 
 			// Get the term language.
-			$term_language = $polylang->model->get_term_language($term->term_id);
+			$term_language = PLL()->model->get_term_language($term->term_id);
 			if ($term_language) {
 				$lang = $term_language->slug;
 			} else {
@@ -333,7 +326,7 @@ class Polylang_Translate_Rewrite_Slugs {
 	 * Fix "PLL_Frontend_Links->get_translation_url()".
 	 */
 	public function pll_translation_url_filter($url, $lang) {
-		global $wp_query, $polylang;
+		global $wp_query;
 
 		if (is_category()) {
 			$term = get_category_by_slug($wp_query->get('category_name'));
